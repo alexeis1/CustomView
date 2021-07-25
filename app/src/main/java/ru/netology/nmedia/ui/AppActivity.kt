@@ -14,7 +14,7 @@ class AppActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         val binding = ActivityAppBinding.inflate(layoutInflater)
         setContentView(binding.root)
-        binding.stats.data = listOf(0.25F, 0.25F, 0.25F, 0.25F)
-
+        binding.stats.data = listOf(500F, 500F, 500F, 500F)
+        binding.stats.maxValue = binding.stats.data.sum() * 2
     }
 }

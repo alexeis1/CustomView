@@ -19,10 +19,5 @@
         app:color4="#FF0266"
         />
 
-    <TextView
-        android:id="@+id/textView"
-        android:layout_width="match_parent"
-        android:layout_height="83dp"
-        android:text="TextView" />
 </FrameLayout>
 

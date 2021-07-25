@@ -2,6 +2,7 @@ package ru.netology.nmedia.ui
 
 import android.content.Context
 import android.graphics.Canvas
+import android.graphics.Color.rgb
 import android.graphics.Paint
 import android.graphics.PointF
 import android.graphics.RectF
@@ -11,6 +12,8 @@ import android.view.View
 import androidx.core.content.withStyledAttributes
 import ru.netology.nmedia.R
 import ru.netology.nmedia.util.AndroidUtils
+import java.lang.Double.sum
+import java.util.Collections.list
 import kotlin.math.min
 import kotlin.random.Random
 
@@ -27,16 +30,16 @@ class StatsView @JvmOverloads constructor(
 
     private var lineWidth = AndroidUtils.dp(context, 5F).toFloat()
     private var fontSize = AndroidUtils.dp(context, 40F).toFloat()
-    private var colors = emptyList<Int>()
+    private var colors   = emptyList<Int>()
+    private var emptyColor = rgb(238,238,238)
+    private var bkColor    = rgb(255, 255, 255)
 
-    init {/*
-        val inflater =
-            getContext().getSystemService(Context.LAYOUT_INFLATER_SERVICE) as LayoutInflater
-        val v = inflater.inflate(R.layout.sta, null)*/
-
+    init {
         context.withStyledAttributes(attrs, R.styleable.StatsView) {
-            lineWidth = getDimension(R.styleable.StatsView_lineWidth, lineWidth)
-            fontSize = getDimension(R.styleable.StatsView_fontSize, fontSize)
+            bkColor    = getColor(R.styleable.StatsView_bkColor, bkColor)
+            emptyColor = getColor(R.styleable.StatsView_emptyColor, emptyColor)
+            lineWidth  = getDimension(R.styleable.StatsView_lineWidth, lineWidth)
+            fontSize   = getDimension(R.styleable.StatsView_fontSize, fontSize)
             colors = listOf(
                 getColor(
                     R.styleable.StatsView_color1,
@@ -88,15 +91,24 @@ class StatsView @JvmOverloads constructor(
         strokeCap = Paint.Cap.ROUND
         strokeJoin = Paint.Join.ROUND
     }
+
     private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.FILL
         textAlign = Paint.Align.CENTER
         textSize = fontSize
     }
 
+    var maxValue: Float = -1F
+        set(value) {
+            field = if (value >= 0) value else data.sum()
+            invalidate()
+        }
+
     var data: List<Float> = emptyList()
         set(value) {
+            maxValue = if (maxValue <= 0) value.sum() else maxValue
             field = value
+            updateColorTable()
             invalidate()
         }
 
@@ -109,21 +121,48 @@ class StatsView @JvmOverloads constructor(
         )
     }
 
+    private fun updateColorTable(){
+        //поскольку отрисовка ведется в 2 этапа, то уже нельзя
+        //каждый раз генерить случайный цвет. Обе части должны рисоваться одинаковым цветом
+        if (data.size > colors.size){
+            val newColorList = mutableListOf<Int>()
+            repeat(data.size - colors.size){
+                newColorList.add(randomColor())
+            }
+            colors = colors + newColorList
+        }
+    }
+
     override fun onDraw(canvas: Canvas) {
         if (data.isEmpty()) {
             return
         }
 
+        paint.color = emptyColor
+        canvas.drawCircle(center.x, center.y, radius, paint)
+        //рандомный цвет не требуется нужное количество цветов ганатинуется
+        //функцией updateColorTable()
+        //разбиваем отрисовкуд дуги на 2е равные половине участка
+        //сначала рисуем концовку
+        val dataPct = data.map { it / maxValue }
         var startFrom = -90F
-        for ((index, datum) in data.withIndex()) {
+        for ((index, datum) in dataPct.withIndex()) {
             val angle = 360F * datum
-            paint.color = colors.getOrNull(index) ?: randomColor()
-            canvas.drawArc(oval, startFrom, angle, false, paint)
+            paint.color = colors[index]
+            canvas.drawArc(oval, startFrom + angle / 2, angle / 2, false, paint)
+            startFrom += angle
+        }
+        //потом рисуем начало дуги
+        startFrom = -90F
+        for ((index, datum) in dataPct.withIndex()) {
+            val angle = 360F * datum
+            paint.color = colors[index]
+            canvas.drawArc(oval, startFrom, angle / 2, false, paint)
             startFrom += angle
         }
 
         canvas.drawText(
-            "%.2f%%".format(data.sum() * 100),
+            "%.2f%%".format(dataPct.sum() * 100),
             center.x,
             center.y + textPaint.textSize / 4,
             textPaint,
